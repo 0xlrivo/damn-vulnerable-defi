@@ -57,16 +57,21 @@ contract SelfiePool is ReentrancyGuard, IERC3156FlashLender {
             revert UnsupportedCurrency();
 
         token.transfer(address(_receiver), _amount);
+
+        // @note dato che qui il callback è forzato a msg.sender non posso usare il trick di
+        // approvarmi per tutti i token della pool... devo per forza passare per una governance proposal
+        // e vincerla creandomi uno snapshot apposta per passarla
+
         if (_receiver.onFlashLoan(msg.sender, _token, _amount, 0, _data) != CALLBACK_SUCCESS)
             revert CallbackFailed();
 
         if (!token.transferFrom(address(_receiver), address(this), _amount))
             revert RepayFailed();
-        
+
         return true;
     }
 
-    function emergencyExit(address receiver) external onlyGovernance {
+    function emergencyExit(address receiver) external onlyGovernance { // @attack
         uint256 amount = token.balanceOf(address(this));
         token.transfer(receiver, amount);
 

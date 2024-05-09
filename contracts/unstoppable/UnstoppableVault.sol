@@ -6,6 +6,7 @@ import "solmate/src/utils/ReentrancyGuard.sol";
 import { SafeTransferLib, ERC4626, ERC20 } from "solmate/src/mixins/ERC4626.sol";
 import "solmate/src/auth/Owned.sol";
 import { IERC3156FlashBorrower, IERC3156FlashLender } from "@openzeppelin/contracts/interfaces/IERC3156.sol";
+import "hardhat/console.sol";
 
 /**
  * @title UnstoppableVault
@@ -78,12 +79,13 @@ contract UnstoppableVault is IERC3156FlashLender, ReentrancyGuard, Owned, ERC462
                 revert(0x1c, 0x04)
             }
         }
-        return asset.balanceOf(address(this));
+        return asset.balanceOf(address(this)); // @audit quanti DVT contiene questo contratto
     }
 
     /**
      * @inheritdoc IERC3156FlashLender
      */
+    // @note totalSupply si riferisce al numero di share token in esistenza
     function flashLoan(
         IERC3156FlashBorrower receiver,
         address _token,
@@ -92,8 +94,16 @@ contract UnstoppableVault is IERC3156FlashLender, ReentrancyGuard, Owned, ERC462
     ) external returns (bool) {
         if (amount == 0) revert InvalidAmount(0); // fail early
         if (address(asset) != _token) revert UnsupportedCurrency(); // enforce ERC3156 requirement
-        uint256 balanceBefore = totalAssets();
+
+        // @audit quanti token DVT contiene questo contratto
+        uint256 balanceBefore = totalAssets(); // @note solmate fà implementare a te totalAssets()
+
+        console.log(totalAssets());
+        console.log(totalSupply);
+
+        // @audit convertToShares(DVT in esistenza) != DVT in questo smart contract
         if (convertToShares(totalSupply) != balanceBefore) revert InvalidBalance(); // enforce ERC4626 requirement
+
         uint256 fee = flashFee(_token, amount);
         // transfer tokens out + execute callback on receiver
         ERC20(_token).safeTransfer(address(receiver), amount);

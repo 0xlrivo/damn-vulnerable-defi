@@ -31,15 +31,15 @@ contract FlashLoanerPool is ReentrancyGuard {
             revert NotEnoughTokenBalance();
         }
 
-        if (!msg.sender.isContract()) {
+        if (!msg.sender.isContract()) { // only smart contracts can call this function
             revert CallerIsNotContract();
         }
 
-        liquidityToken.transfer(msg.sender, amount);
+        liquidityToken.transfer(msg.sender, amount); // transfer flash-loaned DVT to requester
 
-        msg.sender.functionCall(abi.encodeWithSignature("receiveFlashLoan(uint256)", amount));
+        msg.sender.functionCall(abi.encodeWithSignature("receiveFlashLoan(uint256)", amount)); // callback
 
-        if (liquidityToken.balanceOf(address(this)) < balanceBefore) {
+        if (liquidityToken.balanceOf(address(this)) < balanceBefore) { // asserting that flashloan has been paid back
             revert FlashLoanNotPaidBack();
         }
     }

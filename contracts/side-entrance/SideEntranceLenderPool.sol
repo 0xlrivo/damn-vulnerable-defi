@@ -20,6 +20,8 @@ contract SideEntranceLenderPool {
     event Deposit(address indexed who, uint256 amount);
     event Withdraw(address indexed who, uint256 amount);
 
+    // @audit i can call this inside the flash loan and deposit all the ETH I have + the loaned one
+    // @fix should assert that msg.sender != address(this)
     function deposit() external payable {
         unchecked {
             balances[msg.sender] += msg.value;

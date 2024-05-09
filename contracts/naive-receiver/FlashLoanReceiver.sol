@@ -13,7 +13,7 @@ import "./NaiveReceiverLenderPool.sol";
 contract FlashLoanReceiver is IERC3156FlashBorrower {
 
     address private pool;
-    address private constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+    address private constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE; // burn address
 
     error UnsupportedCurrency();
 
@@ -28,6 +28,8 @@ contract FlashLoanReceiver is IERC3156FlashBorrower {
         uint256 fee,
         bytes calldata
     ) external returns (bytes32) {
+
+        // si assicura che msg.sender == pool
         assembly { // gas savings
             if iszero(eq(sload(pool.slot), caller())) {
                 mstore(0x00, 0x48f5c3ed)

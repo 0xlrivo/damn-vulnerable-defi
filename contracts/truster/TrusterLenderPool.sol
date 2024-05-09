@@ -29,9 +29,10 @@ contract TrusterLenderPool is ReentrancyGuard {
         uint256 balanceBefore = token.balanceOf(address(this));
 
         token.transfer(borrower, amount);
-        target.functionCall(data);
+        target.functionCall(data); // @audit arbitrary extrnal call on behalf of this pool
+        // @audit so i can approve myself (msg.sender = pool) to spend all of the pool's token
 
-        if (token.balanceOf(address(this)) < balanceBefore)
+        if (token.balanceOf(address(this)) < balanceBefore) // @audit pass this check, and after this function ends, simply transferFrom(pool, me, 1MLN)
             revert RepayFailed();
 
         return true;
