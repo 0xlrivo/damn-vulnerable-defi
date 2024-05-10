@@ -22,7 +22,7 @@ contract PuppetV2Pool {
     IERC20 private _token;
     IERC20 private _weth;
 
-    mapping(address => uint256) public deposits;
+    mapping(address => uint256) public deposits; // accounting
 
     event Borrowed(address indexed borrower, uint256 depositRequired, uint256 borrowAmount, uint256 timestamp);
 
@@ -57,13 +57,14 @@ contract PuppetV2Pool {
 
     function calculateDepositOfWETHRequired(uint256 tokenAmount) public view returns (uint256) {
         uint256 depositFactor = 3;
-        return _getOracleQuote(tokenAmount).mul(depositFactor) / (1 ether);
+        return _getOracleQuote(tokenAmount).mul(depositFactor) / (1 ether); // (tokenAmount * 3)/1e18 [WRONG DECIMALS -> 0]
     }
 
     // Fetch the price from Uniswap v2 using the official libraries
     function _getOracleQuote(uint256 amount) private view returns (uint256) {
         (uint256 reservesWETH, uint256 reservesToken) =
             UniswapV2Library.getReserves(_uniswapFactory, address(_weth), address(_token));
+        // amount.mul(1e18) non ha senso, così calcoli la quote con 36 decimals
         return UniswapV2Library.quote(amount.mul(10 ** 18), reservesToken, reservesWETH);
     }
 }

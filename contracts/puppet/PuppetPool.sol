@@ -12,12 +12,12 @@ import "../DamnValuableToken.sol";
 contract PuppetPool is ReentrancyGuard {
     using Address for address payable;
 
-    uint256 public constant DEPOSIT_FACTOR = 2;
+    uint256 public constant DEPOSIT_FACTOR = 2; // 200% over-collateralization
 
     address public immutable uniswapPair;
     DamnValuableToken public immutable token;
 
-    mapping(address => uint256) public deposits;
+    mapping(address => uint256) public deposits; // internal accounting
 
     error NotEnoughCollateral();
     error TransferFailed();
@@ -31,7 +31,7 @@ contract PuppetPool is ReentrancyGuard {
 
     // Allows borrowing tokens by first depositing two times their value in ETH
     function borrow(uint256 amount, address recipient) external payable nonReentrant {
-        uint256 depositRequired = calculateDepositRequired(amount);
+        uint256 depositRequired = calculateDepositRequired(amount); // @audit oracle manipulation of the Uniswap pool
 
         if (msg.value < depositRequired)
             revert NotEnoughCollateral();
@@ -52,13 +52,14 @@ contract PuppetPool is ReentrancyGuard {
 
         emit Borrowed(msg.sender, recipient, depositRequired, amount);
     }
-
+    
+    // all'inizio 1 DVT = 1 ETH
     function calculateDepositRequired(uint256 amount) public view returns (uint256) {
         return amount * _computeOraclePrice() * DEPOSIT_FACTOR / 10 ** 18;
     }
 
     function _computeOraclePrice() private view returns (uint256) {
         // calculates the price of the token in wei according to Uniswap pair
-        return uniswapPair.balance * (10 ** 18) / token.balanceOf(uniswapPair);
+        return uniswapPair.balance * (10 ** 18) / token.balanceOf(uniswapPair); // eth/token
     }
 }

