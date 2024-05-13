@@ -52,8 +52,9 @@ contract FreeRiderRecovery is ReentrancyGuard, IERC721Receiver {
             revert StillNotOwningToken(_tokenId);
 
         if (++received == 6) {
-            address recipient = abi.decode(_data, (address));
-            payable(recipient).sendValue(PRIZE);
+            //address recipient = abi.decode(_data, (address));
+            //payable(recipient).sendValue(PRIZE);
+            payable(beneficiary).sendValue(PRIZE);
         }
 
         return IERC721Receiver.onERC721Received.selector;

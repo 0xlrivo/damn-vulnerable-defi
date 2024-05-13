@@ -7,6 +7,8 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@gnosis.pm/safe-contracts/contracts/GnosisSafe.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/IProxyCreationCallback.sol";
 
+import "hardhat/console.sol";
+
 /**
  * @title WalletRegistry
  * @notice A registry for Gnosis Safe wallets.
@@ -14,19 +16,20 @@ import "@gnosis.pm/safe-contracts/contracts/proxies/IProxyCreationCallback.sol";
  * @dev The registry has embedded verifications to ensure only legitimate Gnosis Safe wallets are stored.
  * @author Damn Vulnerable DeFi (https://damnvulnerabledefi.xyz)
  */
+// @note utilizza Ownable di Solady... non di OZ
 contract WalletRegistry is IProxyCreationCallback, Ownable {
     uint256 private constant EXPECTED_OWNERS_COUNT = 1;
-    uint256 private constant EXPECTED_THRESHOLD = 1;
+    uint256 private constant EXPECTED_THRESHOLD = 1; // @audit-issue unsafe threshold
     uint256 private constant PAYMENT_AMOUNT = 10 ether;
 
-    address public immutable masterCopy;
-    address public immutable walletFactory;
-    IERC20 public immutable token;
+    address public immutable masterCopy; // contratto GnosisSafe
+    address public immutable walletFactory; // contratto GnosisSafeProxyFactory
+    IERC20 public immutable token; // DVT token address
 
-    mapping(address => bool) public beneficiaries;
+    mapping(address => bool) public beneficiaries; // traccia i beneficiari approvati
 
     // owner => wallet
-    mapping(address => address) public wallets;
+    mapping(address => address) public wallets; // traccia i wallet Gnosis Safe deployati al loro owner
 
     error NotEnoughFunds();
     error CallerNotFactory();
@@ -41,15 +44,15 @@ contract WalletRegistry is IProxyCreationCallback, Ownable {
         address masterCopyAddress,
         address walletFactoryAddress,
         address tokenAddress,
-        address[] memory initialBeneficiaries
+        address[] memory initialBeneficiaries // indirizzi dei benificiari iniziali
     ) {
-        _initializeOwner(msg.sender);
+        _initializeOwner(msg.sender); // imposta msg.sender come owner
 
         masterCopy = masterCopyAddress;
         walletFactory = walletFactoryAddress;
         token = IERC20(tokenAddress);
 
-        for (uint256 i = 0; i < initialBeneficiaries.length;) {
+        for (uint256 i = 0; i < initialBeneficiaries.length;) { // inizializza il mapping beneficiaries
             unchecked {
                 beneficiaries[initialBeneficiaries[i]] = true;
                 ++i;
@@ -65,22 +68,22 @@ contract WalletRegistry is IProxyCreationCallback, Ownable {
      * @notice Function executed when user creates a Gnosis Safe wallet via GnosisSafeProxyFactory::createProxyWithCallback
      *          setting the registry's address as the callback.
      */
-    function proxyCreated(GnosisSafeProxy proxy, address singleton, bytes calldata initializer, uint256)
+    function proxyCreated(GnosisSafeProxy proxy, address singleton, bytes calldata initializer, uint256) // @note questa è la funzione che determina le rewards quindi
         external
         override
     {
-        if (token.balanceOf(address(this)) < PAYMENT_AMOUNT) { // fail early
+        if (token.balanceOf(address(this)) < PAYMENT_AMOUNT) { // this contract must have more than 10 DVT tokens
             revert NotEnoughFunds();
         }
 
-        address payable walletAddress = payable(proxy);
+        address payable walletAddress = payable(proxy); // address a cui (in caso) mandare i 10 DVT di ricompensa
 
         // Ensure correct factory and master copy
-        if (msg.sender != walletFactory) {
+        if (msg.sender != walletFactory) { // solo GnosisSafeProxyFactory può chiamare questa funzione
             revert CallerNotFactory();
         }
 
-        if (singleton != masterCopy) {
+        if (singleton != masterCopy) { // l'utente deve aver deployato un wallet usando l'istanza giusta di GnosisSafe
             revert FakeMasterCopy();
         }
 
@@ -90,20 +93,20 @@ contract WalletRegistry is IProxyCreationCallback, Ownable {
         }
 
         // Ensure wallet initialization is the expected
-        uint256 threshold = GnosisSafe(walletAddress).getThreshold();
+        uint256 threshold = GnosisSafe(walletAddress).getThreshold(); // si assicura che il wallet deployato abbia il corretto Threshold
         if (threshold != EXPECTED_THRESHOLD) {
             revert InvalidThreshold(threshold);
         }
 
         address[] memory owners = GnosisSafe(walletAddress).getOwners();
-        if (owners.length != EXPECTED_OWNERS_COUNT) {
+        if (owners.length != EXPECTED_OWNERS_COUNT) { // si assicura che il wallet deployato abbia il corretto numero di owners
             revert InvalidOwnersCount(owners.length);
         }
 
         // Ensure the owner is a registered beneficiary
         address walletOwner;
         unchecked {
-            walletOwner = owners[0];
+            walletOwner = owners[0]; // @question unchecked toglie la out-of-bounds protection per gli array?
         }
         if (!beneficiaries[walletOwner]) {
             revert OwnerIsNotABeneficiary();

@@ -46,6 +46,18 @@ describe('[Challenge] Backdoor', function () {
 
     it('Execution', async function () {
         /** CODE YOUR SOLUTION HERE */
+
+        const backdoorExploiterFactory = await ethers.getContractFactory("BackdoorExploiter", player)
+        const backdoorExploiter = await backdoorExploiterFactory.deploy(
+            masterCopy.address,
+            walletRegistry.address,
+            token.address,
+            walletFactory.address,
+            [alice.address, bob.address, charlie.address, david.address]
+        )
+
+        console.log(await token.balanceOf(player.address))
+
     });
 
     after(async function () {
@@ -56,6 +68,7 @@ describe('[Challenge] Backdoor', function () {
 
         for (let i = 0; i < users.length; i++) {
             let wallet = await walletRegistry.wallets(users[i]);
+            console.log(wallet);
             
             // User must have registered a wallet
             expect(wallet).to.not.eq(

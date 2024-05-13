@@ -13,7 +13,7 @@ contract FreeRiderNFTMarketplace is ReentrancyGuard {
     using Address for address payable;
 
     DamnValuableNFT public token;
-    uint256 public offersCount;
+    uint256 public offersCount; // slot 0x02
 
     // tokenId -> price
     mapping(uint256 => uint256) private offers;
@@ -61,16 +61,18 @@ contract FreeRiderNFTMarketplace is ReentrancyGuard {
         if (price == 0)
             revert InvalidPrice();
 
-        if (msg.sender != _token.ownerOf(tokenId))
+        if (msg.sender != _token.ownerOf(tokenId)) // assert that the caller owns the NFT
             revert CallerNotOwner(tokenId);
 
+        // _token.getApproved(tokenId) -> si aspetta che msg.sender abbia approvato questo specifico tokenId a questo contratto
+        // token.isApprovedForAll() -> msg.sender deve aver approvato questo contratto a spendere tutti i suoi NFT
         if (_token.getApproved(tokenId) != address(this) && !_token.isApprovedForAll(msg.sender, address(this)))
             revert InvalidApproval();
 
-        offers[tokenId] = price;
+        offers[tokenId] = price; // set offer
 
         assembly { // gas savings
-            sstore(0x02, add(sload(0x02), 0x01))
+            sstore(0x02, add(sload(0x02), 0x01)) // offerCount++
         }
 
         emit NFTOffered(msg.sender, tokenId, price);
@@ -86,22 +88,25 @@ contract FreeRiderNFTMarketplace is ReentrancyGuard {
     }
 
     function _buyOne(uint256 tokenId) private {
-        uint256 priceToPay = offers[tokenId];
+        uint256 priceToPay = offers[tokenId]; // how much this NFT costs
         if (priceToPay == 0)
             revert TokenNotOffered(tokenId);
 
-        if (msg.value < priceToPay)
+        // @audit-issue msg.value is used inside a loop - meaning that you can buy N nft by only paying for the most expensive one since msg.value stays the same for the whole transaction
+        // @audit-info msg.value doesn't change even if we sent ETH out
+        if (msg.value < priceToPay) // if sender doesn't send enough ETH
             revert InsufficientPayment();
 
         --offersCount;
 
         // transfer from seller to buyer
         DamnValuableNFT _token = token; // cache for gas savings
+        // @audit-issue will fail if seller revokes approval, since listed NFTs are never transfered to this contract
         _token.safeTransferFrom(_token.ownerOf(tokenId), msg.sender, tokenId);
 
         // pay seller using cached token
+         // @audit-issue the buyer (msg.sender) is already the owner at this point, we're just refunding him
         payable(_token.ownerOf(tokenId)).sendValue(priceToPay);
-
         emit NFTBought(msg.sender, tokenId, priceToPay);
     }
 
