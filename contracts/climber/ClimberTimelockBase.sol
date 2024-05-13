@@ -33,14 +33,14 @@ abstract contract ClimberTimelockBase is AccessControl {
 
         if (op.known) {
             if (op.executed) {
-                state = OperationState.Executed;
+                state = OperationState.Executed; // known && executed
             } else if (block.timestamp < op.readyAtTimestamp) {
-                state = OperationState.Scheduled;
+                state = OperationState.Scheduled; // known && waiting for timelock of 1 hour
             } else {
-                state = OperationState.ReadyForExecution;
+                state = OperationState.ReadyForExecution; // known && ready to be executed
             }
         } else {
-            state = OperationState.Unknown;
+            state = OperationState.Unknown; // not known, must be proposed
         }
     }
 

